@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MM Qbank Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0d0d0d; --surface: #141414; --surface2: #1c1c1c;
+    --border: #2a2a2a; --accent: #00e5a0; --accent-dim: #00e5a015;
+    --accent-mid: #00e5a050; --text: #e8e8e8; --text-dim: #888;
+    --text-muted: #555; --red: #ff5252;
+  }
+  html { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; }
+  body { min-height: 100vh; }
+
+  /* SETUP SCREEN */
+  #setup-screen {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 24px;
+  }
+  .setup-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 40px; max-width: 480px; width: 100%;
+  }
+  .setup-logo { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--accent); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 12px; }
+  .setup-title { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
+  .setup-sub { font-size: 13px; color: var(--text-dim); line-height: 1.6; margin-bottom: 28px; }
+  .setup-label { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+  .setup-input {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 13px;
+    padding: 10px 14px; border-radius: 4px; outline: none; margin-bottom: 20px;
+    transition: border-color 0.15s;
+  }
+  .setup-input:focus { border-color: var(--accent); }
+  .setup-btn {
+    width: 100%; background: var(--accent); color: #000; font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px; font-weight: 700; padding: 12px; border: none; border-radius: 4px;
+    cursor: pointer; letter-spacing: 0.06em; transition: opacity 0.15s;
+  }
+  .setup-btn:hover { opacity: 0.85; }
+  .setup-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .setup-note { font-size: 11px; color: var(--text-muted); margin-top: 16px; line-height: 1.5; }
+  .setup-note a { color: var(--accent); }
+  .setup-error { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--red); margin-top: 12px; display: none; }
+
+  /* LOADING */
+  #loading-screen {
+    display: none; align-items: center; justify-content: center;
+    min-height: 100vh; flex-direction: column; gap: 16px;
+  }
+  .loader-title { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--accent); }
+  .loader-sub { font-size: 12px; color: var(--text-muted); font-family: 'IBM Plex Mono', monospace; }
+  .spinner {
+    width: 32px; height: 32px; border: 2px solid var(--border);
+    border-top-color: var(--accent); border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* MAIN APP */
+  #app { display: none; height: 100vh; overflow: hidden; flex-direction: row; }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 220px; flex-shrink: 0; background: var(--surface);
+    border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto;
+  }
+  .sidebar-header {
+    padding: 18px 16px 12px; font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--text-muted); border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .nav-item {
+    padding: 10px 16px; cursor: pointer; border-left: 2px solid transparent;
+    transition: all 0.12s; display: flex; justify-content: space-between; align-items: center;
+  }
+  .nav-item:hover { background: var(--surface2); }
+  .nav-item.active { border-left-color: var(--accent); background: var(--accent-dim); }
+  .nav-label { font-size: 13px; font-weight: 500; }
+  .nav-item.active .nav-label { color: var(--accent); }
+  .nav-badge { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-muted); }
+  .nav-item.active .nav-badge { color: var(--accent); }
+  .sidebar-footer { margin-top: auto; padding: 12px 16px; border-top: 1px solid var(--border); }
+  .gp-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-muted); margin-bottom: 5px; display: flex; justify-content: space-between; }
+  .bar-track { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.4s ease; }
+  .gp-count { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-muted); text-align: center; margin-top: 4px; }
+  .sidebar-btn {
+    background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; padding: 5px 8px;
+    border-radius: 3px; cursor: pointer; transition: all 0.1s; width: 100%; margin-top: 6px;
+  }
+  .sidebar-btn:hover { border-color: var(--accent-mid); color: var(--accent); }
+  .sidebar-btn.danger { color: var(--red); }
+  .sidebar-btn.danger:hover { border-color: var(--red); background: #ff525210; }
+
+  /* MAIN */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .header {
+    padding: 20px 24px 16px; border-bottom: 1px solid var(--border);
+    background: var(--surface); flex-shrink: 0; display: flex;
+    align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  .header-left { flex: 1; min-width: 0; }
+  .app-title { font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 700; color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 2px; }
+  .section-title { font-size: 20px; font-weight: 600; line-height: 1.2; }
+  .header-stats { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+  .header-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .search-wrap { position: relative; }
+  .search-wrap input {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px; padding: 8px 32px 8px 12px;
+    border-radius: 4px; width: 220px; outline: none; transition: border-color 0.15s;
+  }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-wrap input::placeholder { color: var(--text-muted); }
+  .search-clear { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--text-muted); font-size: 14px; display: none; }
+  .search-clear.vis { display: block; }
+  .filter-tabs { display: flex; gap: 4px; }
+  .ftab {
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 6px 12px;
+    border-radius: 4px; border: 1px solid var(--border); background: transparent;
+    color: var(--text-dim); cursor: pointer; transition: all 0.12s; letter-spacing: 0.04em;
+  }
+  .ftab:hover { border-color: var(--accent-mid); color: var(--text); }
+  .ftab.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+  /* BULK BAR */
+  .bulk-bar {
+    padding: 8px 24px; background: var(--surface); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; flex-shrink: 0;
+  }
+  .bulk-btn {
+    background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; padding: 4px 10px;
+    border-radius: 3px; cursor: pointer; transition: all 0.1s;
+  }
+  .bulk-btn:hover { border-color: var(--accent-mid); color: var(--accent); }
+  .bulk-count { color: var(--text-muted); }
+
+  /* REFRESH BAR */
+  .refresh-bar {
+    padding: 6px 24px; background: #00e5a008; border-bottom: 1px solid var(--accent-mid);
+    display: none; align-items: center; gap: 10px; font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px; color: var(--accent);
+  }
+  .refresh-bar.vis { display: flex; }
+
+  /* CONTENT */
+  .content { flex: 1; overflow-y: auto; padding: 16px 24px 32px; }
+  .content::-webkit-scrollbar { width: 6px; }
+  .content::-webkit-scrollbar-track { background: transparent; }
+  .content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* VIDEO LIST */
+  .section-block { margin-bottom: 28px; }
+  .section-label {
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 700;
+    color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 10px;
+  }
+  .section-progress { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .sp-bar { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .sp-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.4s; }
+  .sp-text { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text-dim); flex-shrink: 0; }
+  .video-list { display: flex; flex-direction: column; gap: 2px; }
+  .video-row {
+    display: flex; align-items: center; gap: 12px; padding: 9px 12px;
+    border-radius: 5px; transition: background 0.1s; border: 1px solid transparent;
+  }
+  .video-row:hover { background: var(--surface2); border-color: var(--border); }
+  .video-row.watched { background: #00e5a008; }
+  .video-row.watched .vtitle { color: var(--text-muted); text-decoration: line-through; text-decoration-color: var(--text-muted); }
+  .check {
+    width: 17px; height: 17px; border-radius: 3px; border: 1.5px solid var(--border);
+    cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    transition: all 0.12s;
+  }
+  .check:hover { border-color: var(--accent); }
+  .check.checked { background: var(--accent); border-color: var(--accent); }
+  .check.checked::after { content: '✓'; font-size: 10px; color: #000; font-weight: 700; }
+  .vinfo { flex: 1; min-width: 0; }
+  .vtitle { font-size: 13px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }
+  .vlink { margin-left: auto; flex-shrink: 0; }
+  .vlink a {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-muted);
+    text-decoration: none; padding: 4px 8px; border: 1px solid var(--border);
+    border-radius: 3px; transition: all 0.1s; white-space: nowrap;
+  }
+  .vlink a:hover { border-color: var(--accent-mid); color: var(--accent); }
+  .new-badge {
+    font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--accent);
+    border: 1px solid var(--accent-mid); padding: 1px 5px; border-radius: 2px;
+    flex-shrink: 0; letter-spacing: 0.06em;
+  }
+  .empty { text-align: center; padding: 60px 20px; color: var(--text-muted); font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
+  mark { background: var(--accent-mid); color: inherit; border-radius: 2px; padding: 0 1px; }
+</style>
+</head>
+<body>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <div class="setup-logo">MM Qbank Tracker</div>
+    <div class="setup-title">Enter your YouTube API Key</div>
+    <div class="setup-sub">This app fetches Mehlman Medical's playlists live — so it always stays up to date when new videos are added.</div>
+    <div class="setup-label">YouTube Data API v3 Key</div>
+    <input type="text" class="setup-input" id="api-key-input" placeholder="AIzaSy..." autocomplete="off" spellcheck="false">
+    <button class="setup-btn" id="start-btn" onclick="startApp()">Load Playlists →</button>
+    <div class="setup-error" id="setup-error"></div>
+    <div class="setup-note">
+      Your key is stored only in this browser — never sent anywhere except YouTube's API.<br>
+      ⚠️ <strong>Reminder:</strong> Since you shared your key in chat, <a href="https://console.cloud.google.com/apis/credentials" target="_blank">generate a new one here</a> and paste that instead.
+    </div>
+  </div>
+</div>
+
+<!-- LOADING SCREEN -->
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <div class="loader-title" id="loader-msg">Fetching playlists...</div>
+  <div class="loader-sub" id="loader-sub"></div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <aside class="sidebar">
+    <div class="sidebar-header">Playlists</div>
+    <div id="nav"></div>
+    <div class="sidebar-footer">
+      <div style="margin-bottom:8px;">
+        <div class="gp-label"><span>Overall</span><span id="gp-pct">0%</span></div>
+        <div class="bar-track"><div class="bar-fill" id="gp-bar" style="width:0%"></div></div>
+      </div>
+      <div class="gp-count" id="gp-count"></div>
+      <button class="sidebar-btn" onclick="refreshPlaylists()">↻ Refresh playlists</button>
+      <button class="sidebar-btn" onclick="changeKey()">⚙ Change API key</button>
+      <button class="sidebar-btn danger" onclick="confirmReset()">⚠ Reset all progress</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="header">
+      <div class="header-left">
+        <div class="app-title">MM Qbank Tracker</div>
+        <div class="section-title" id="section-name">All Playlists</div>
+        <div class="header-stats" id="section-stats"></div>
+      </div>
+      <div class="header-controls">
+        <div class="search-wrap">
+          <input type="text" id="search" placeholder="Search videos..." oninput="handleSearch(this.value)">
+          <span class="search-clear" id="search-clear" onclick="clearSearch()">✕</span>
+        </div>
+        <div class="filter-tabs">
+          <button class="ftab active" onclick="setFilter('all',this)">All</button>
+          <button class="ftab" onclick="setFilter('unwatched',this)">Unwatched</button>
+          <button class="ftab" onclick="setFilter('watched',this)">Watched</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="bulk-bar">
+      <span class="bulk-count" id="visible-count">— videos</span>
+      <button class="bulk-btn" onclick="markVisibleAll(true)">✓ Mark all watched</button>
+      <button class="bulk-btn" onclick="markVisibleAll(false)">✕ Mark all unwatched</button>
+    </div>
+
+    <div class="refresh-bar" id="refresh-bar">
+      <span>↻</span><span id="refresh-msg"></span>
+    </div>
+
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<script>
+// ─── CONSTANTS ───────────────────────────────────────────────
+const CHANNEL_ID = 'UCU7QPxZjoJDx8Fes04GbpzA';
+const STORAGE_KEY = 'mm_tracker_v2';
+const API_KEY_STORAGE = 'mm_api_key';
+const PLAYLIST_CACHE_KEY = 'mm_playlist_cache';
+const CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
+
+// ─── STATE ───────────────────────────────────────────────────
+let apiKey = '';
+let playlists = []; // [{id, title, videos:[{id,title,url}]}]
+let watched = {};
+let activeSection = 'ALL';
+let activeFilter = 'all';
+let searchQuery = '';
+let visibleVideos = [];
+
+// ─── STORAGE ─────────────────────────────────────────────────
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    watched = s.watched || {};
+  } catch(e) { watched = {}; }
+}
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ watched }));
+}
+function loadCache() {
+  try {
+    const c = JSON.parse(localStorage.getItem(PLAYLIST_CACHE_KEY) || 'null');
+    if (c && Date.now() - c.ts < CACHE_TTL) return c.data;
+  } catch(e) {}
+  return null;
+}
+function saveCache(data) {
+  localStorage.setItem(PLAYLIST_CACHE_KEY, JSON.stringify({ ts: Date.now(), data }));
+}
+function clearCache() {
+  localStorage.removeItem(PLAYLIST_CACHE_KEY);
+}
+
+// ─── SETUP ───────────────────────────────────────────────────
+window.onload = () => {
+  loadState();
+  const saved = localStorage.getItem(API_KEY_STORAGE);
+  if (saved) {
+    document.getElementById('api-key-input').value = saved;
+    // Check if we have a valid cache
+    const cached = loadCache();
+    if (cached) {
+      apiKey = saved;
+      playlists = cached;
+      showApp();
+      return;
+    }
+  }
+  document.getElementById('setup-screen').style.display = 'flex';
+};
+
+async function startApp() {
+  const key = document.getElementById('api-key-input').value.trim();
+  if (!key) return;
+  apiKey = key;
+  document.getElementById('setup-error').style.display = 'none';
+  document.getElementById('start-btn').disabled = true;
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('loading-screen').style.display = 'flex';
+  try {
+    await fetchAllPlaylists();
+    localStorage.setItem(API_KEY_STORAGE, key);
+    showApp();
+  } catch(e) {
+    document.getElementById('setup-screen').style.display = 'flex';
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('start-btn').disabled = false;
+    const errEl = document.getElementById('setup-error');
+    errEl.style.display = 'block';
+    errEl.textContent = 'Error: ' + (e.message || 'Could not fetch playlists. Check your API key.');
+  }
+}
+
+function showApp() {
+  document.getElementById('app').style.display = 'flex';
+  buildNav();
+  render();
+}
+
+function changeKey() {
+  localStorage.removeItem(API_KEY_STORAGE);
+  clearCache();
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('setup-screen').style.display = 'flex';
+  document.getElementById('start-btn').disabled = false;
+}
+
+async function refreshPlaylists() {
+  clearCache();
+  document.getElementById('loading-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  setLoaderMsg('Refreshing playlists...');
+  try {
+    const oldCount = playlists.reduce((a,p) => a + p.videos.length, 0);
+    await fetchAllPlaylists();
+    const newCount = playlists.reduce((a,p) => a + p.videos.length, 0);
+    const diff = newCount - oldCount;
+    showApp();
+    if (diff > 0) {
+      showRefreshBar(`${diff} new video${diff!==1?'s':''} added since last refresh`);
+    }
+  } catch(e) {
+    showApp();
+    alert('Refresh failed: ' + e.message);
+  }
+}
+
+function showRefreshBar(msg) {
+  document.getElementById('refresh-msg').textContent = msg;
+  document.getElementById('refresh-bar').classList.add('vis');
+  setTimeout(() => document.getElementById('refresh-bar').classList.remove('vis'), 6000);
+}
+
+// ─── API FETCH ────────────────────────────────────────────────
+function setLoaderMsg(msg, sub='') {
+  document.getElementById('loader-msg').textContent = msg;
+  document.getElementById('loader-sub').textContent = sub;
+}
+
+async function ytFetch(url) {
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data;
+}
+
+async function fetchAllPlaylists() {
+  setLoaderMsg('Fetching channel playlists...');
+  // Get all playlists from channel
+  let allPlaylists = [];
+  let pageToken = '';
+  do {
+    const url = `https://www.googleapis.com/youtube/v3/playlists?part=snippet&channelId=${CHANNEL_ID}&maxResults=50&key=${apiKey}${pageToken ? '&pageToken=' + pageToken : ''}`;
+    const data = await ytFetch(url);
+    allPlaylists = allPlaylists.concat(data.items || []);
+    pageToken = data.nextPageToken || '';
+  } while (pageToken);
+
+  setLoaderMsg(`Found ${allPlaylists.length} playlists. Fetching videos...`);
+
+  // Fetch videos for each playlist
+  const result = [];
+  for (let i = 0; i < allPlaylists.length; i++) {
+    const pl = allPlaylists[i];
+    setLoaderMsg(`Loading playlist ${i+1} of ${allPlaylists.length}...`, pl.snippet.title);
+    const videos = await fetchPlaylistVideos(pl.id);
+    if (videos.length > 0) {
+      result.push({
+        id: pl.id,
+        title: pl.snippet.title,
+        videos
+      });
+    }
+  }
+
+  // Sort playlists alphabetically
+  result.sort((a,b) => a.title.localeCompare(b.title));
+  playlists = result;
+  saveCache(playlists);
+}
+
+async function fetchPlaylistVideos(playlistId) {
+  let videos = [];
+  let pageToken = '';
+  do {
+    const url = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=50&key=${apiKey}${pageToken ? '&pageToken=' + pageToken : ''}`;
+    const data = await ytFetch(url);
+    const items = (data.items || []).filter(item =>
+      item.snippet.resourceId.kind === 'youtube#video' &&
+      item.snippet.title !== 'Deleted video' &&
+      item.snippet.title !== 'Private video'
+    );
+    videos = videos.concat(items.map(item => ({
+      id: item.snippet.resourceId.videoId,
+      title: item.snippet.title,
+      url: `https://www.youtube.com/watch?v=${item.snippet.resourceId.videoId}`
+    })));
+    pageToken = data.nextPageToken || '';
+  } while (pageToken);
+  return videos;
+}
+
+// ─── NAV ──────────────────────────────────────────────────────
+function buildNav() {
+  const nav = document.getElementById('nav');
+  const totalAll = playlists.reduce((a,p) => a + p.videos.length, 0);
+  let html = `<div class="nav-item${activeSection==='ALL'?' active':''}" onclick="setSection('ALL')">
+    <span class="nav-label">All Playlists</span>
+    <span class="nav-badge">${totalAll}</span>
+  </div>`;
+  playlists.forEach(p => {
+    html += `<div class="nav-item${activeSection===p.id?' active':''}" onclick="setSection('${p.id}')">
+      <span class="nav-label" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">${p.title}</span>
+      <span class="nav-badge">${p.videos.length}</span>
+    </div>`;
+  });
+  nav.innerHTML = html;
+}
+
+function setSection(id) {
+  activeSection = id;
+  buildNav();
+  render();
+}
+
+// ─── FILTER/SEARCH ───────────────────────────────────────────
+function setFilter(f, btn) {
+  activeFilter = f;
+  document.querySelectorAll('.ftab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+function handleSearch(val) {
+  searchQuery = val.toLowerCase().trim();
+  document.getElementById('search-clear').classList.toggle('vis', val.length > 0);
+  render();
+}
+function clearSearch() {
+  document.getElementById('search').value = '';
+  searchQuery = '';
+  document.getElementById('search-clear').classList.remove('vis');
+  render();
+}
+
+// ─── TOGGLE ──────────────────────────────────────────────────
+function toggle(videoId) {
+  if (watched[videoId]) delete watched[videoId];
+  else watched[videoId] = true;
+  saveState();
+  // Update row in place
+  const row = document.querySelector(`[data-vid="${videoId}"]`);
+  if (row) {
+    const isW = !!watched[videoId];
+    row.classList.toggle('watched', isW);
+    row.querySelector('.check').classList.toggle('checked', isW);
+    if (activeFilter !== 'all') render();
+  }
+  updateGlobalStats();
+}
+
+function markVisibleAll(state) {
+  visibleVideos.forEach(v => {
+    if (state) watched[v.id] = true;
+    else delete watched[v.id];
+  });
+  saveState();
+  render();
+}
+
+// ─── RENDER ──────────────────────────────────────────────────
+function hl(text) {
+  if (!searchQuery) return text;
+  const esc = searchQuery.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return text.replace(new RegExp(esc, 'gi'), m => `<mark>${m}</mark>`);
+}
+
+function rowHTML(v) {
+  const isW = !!watched[v.id];
+  return `<div class="video-row${isW?' watched':''}" data-vid="${v.id}">
+    <div class="check${isW?' checked':''}" onclick="toggle('${v.id}')"></div>
+    <div class="vinfo"><div class="vtitle">${hl(v.title)}</div></div>
+    <div class="vlink"><a href="${v.url}" target="_blank" rel="noopener">▶ Watch</a></div>
+  </div>`;
+}
+
+function render() {
+  const activePlaylists = activeSection === 'ALL' ? playlists : playlists.filter(p => p.id === activeSection);
+
+  // Build flat list of matching videos per playlist
+  let allVids = [];
+  activePlaylists.forEach(p => {
+    p.videos.forEach(v => {
+      const isW = !!watched[v.id];
+      if (activeFilter === 'watched' && !isW) return;
+      if (activeFilter === 'unwatched' && isW) return;
+      if (searchQuery && !v.title.toLowerCase().includes(searchQuery)) return;
+      allVids.push({...v, playlist: p.id, isW});
+    });
+  });
+  visibleVideos = allVids;
+
+  // Header
+  const secTotal = activePlaylists.reduce((a,p) => a + p.videos.length, 0);
+  const secWatched = activePlaylists.reduce((a,p) => a + p.videos.filter(v => watched[v.id]).length, 0);
+  const sectionName = activeSection === 'ALL' ? 'All Playlists' : (activePlaylists[0]?.title || '');
+  document.getElementById('section-name').textContent = sectionName;
+  document.getElementById('section-stats').textContent = `${secWatched} / ${secTotal} watched`;
+  document.getElementById('visible-count').textContent = `${allVids.length} video${allVids.length!==1?'s':''}`;
+
+  const content = document.getElementById('content');
+  if (allVids.length === 0) {
+    content.innerHTML = `<div class="empty">No videos match your filters.</div>`;
+    updateGlobalStats();
+    return;
+  }
+
+  let html = '';
+  if (activeSection === 'ALL') {
+    // Group by playlist
+    activePlaylists.forEach(p => {
+      const pVids = allVids.filter(v => v.playlist === p.id);
+      if (pVids.length === 0) return;
+      const total = p.videos.length;
+      const done = p.videos.filter(v => watched[v.id]).length;
+      const pct = total ? Math.round(done/total*100) : 0;
+      html += `<div class="section-block">
+        <div class="section-label">${p.title}</div>
+        <div class="section-progress">
+          <div class="sp-bar"><div class="sp-fill" style="width:${pct}%"></div></div>
+          <div class="sp-text">${done}/${total}</div>
+        </div>
+        <div class="video-list">${pVids.map(v => rowHTML(v)).join('')}</div>
+      </div>`;
+    });
+  } else {
+    const p = activePlaylists[0];
+    const total = p.videos.length;
+    const done = p.videos.filter(v => watched[v.id]).length;
+    const pct = total ? Math.round(done/total*100) : 0;
+    html = `<div class="section-progress">
+      <div class="sp-bar"><div class="sp-fill" style="width:${pct}%"></div></div>
+      <div class="sp-text">${done} / ${total} (${pct}%)</div>
+    </div>
+    <div class="video-list">${allVids.map(v => rowHTML(v)).join('')}</div>`;
+  }
+
+  content.innerHTML = html;
+  updateGlobalStats();
+}
+
+function updateGlobalStats() {
+  const total = playlists.reduce((a,p) => a + p.videos.length, 0);
+  const done = Object.keys(watched).length;
+  const pct = total ? Math.round(done/total*100) : 0;
+  document.getElementById('gp-bar').style.width = pct + '%';
+  document.getElementById('gp-pct').textContent = pct + '%';
+  document.getElementById('gp-count').textContent = `${done} / ${total} videos`;
+}
+
+function confirmReset() {
+  if (confirm('Reset ALL watch progress? Cannot be undone.')) {
+    watched = {};
+    saveState();
+    render();
+  }
+}
+</script>
+</body>
+</html>
